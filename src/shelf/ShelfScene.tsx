@@ -7,6 +7,7 @@ import { CAMERA_FOV, CameraRig } from './CameraRig'
 import type { FocusTarget } from './CameraRig'
 import { findDecoration } from './decorations'
 import { Decoration } from './Decoration'
+import { FramePacer, ResolutionGovernor, useRecentlyBusy } from './FramePacer'
 import { SHELF, lowestDeckY, rowY } from './layout'
 import { PALETTE } from './palette'
 import { buildPlan } from './plan'
@@ -63,6 +64,33 @@ function ShadowBudget() {
 export function ShelfScene() {
   const { focusedId, release, browsing, busy } = useShelf()
   const quality = useSceneQuality()
+  const recentlyBusy = useRecentlyBusy()
+
+  /**
+   * The most resolution this device is allowed to render at.
+   *
+   * The device's own pixel ratio, kept inside the tier: a phone reporting 3
+   * does not mean 3, it means "has spare pixels to waste", and a desktop
+   * reporting 1 does not mean it has a fast GPU.
+   */
+  const ceiling = useMemo(
+    () =>
+      Math.min(
+        quality.dprMax,
+        Math.max(quality.dprMin, window.devicePixelRatio || 1),
+      ),
+    [quality],
+  )
+
+  /**
+   * Whether everyone can stop trying so hard.
+   *
+   * Nothing being held, nothing being carried, and nothing touched for a
+   * second and a half: the shelf is furniture at that point, and a still room
+   * does not need sixty frames a second to stay still.
+   */
+  const idle = !focusedId && !busy && !recentlyBusy
+  const fps = idle ? quality.idleFps : 60
 
   const plan = useMemo(() => buildPlan(), [])
   const rows = plan.length
@@ -152,7 +180,10 @@ export function ShelfScene() {
   return (
     <Canvas
       shadows="percentage"
-      dpr={quality.dpr}
+      // Above the idle rate there is nothing to gain from driving the loop by
+      // hand, so it is handed back to react-three-fiber.
+      frameloop={idle && quality.idleFps < 60 ? 'demand' : 'always'}
+      dpr={[quality.dprMin, ceiling]}
       camera={{ fov: CAMERA_FOV, position: [0, framing.centreY, 6], near: 0.05, far: 60 }}
       gl={{ antialias: quality.antialias, powerPreference: 'high-performance' }}
       // Tapping the wall or anything else puts a game back — but not while it
@@ -167,6 +198,8 @@ export function ShelfScene() {
     >
       <color attach="background" args={[PALETTE.wallBottom]} />
 
+      <ResolutionGovernor min={quality.dprMin} max={ceiling} enabled={!idle} />
+      <FramePacer fps={fps} />
       <ShadowBudget />
 
       <ambientLight intensity={0.38} color="#c9b6e0" />
@@ -216,7 +249,6 @@ export function ShelfScene() {
           centreY={framing.centreY}
           focusTarget={focusTarget}
         />
-
         <Wall rows={rows} centreY={framing.centreY} lightY={framing.lightY} />
         <ShelfUnit rows={rows} />
 

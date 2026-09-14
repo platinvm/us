@@ -28,7 +28,7 @@ export type Phase = 'title' | 'playing' | 'note' | 'win' | 'over' | 'paused'
  * One list, so the rows on the screen, the rows the input walks through and the
  * actions those rows perform can never drift apart.
  */
-export const PAUSE_ITEMS = ['resume', 'sound', 'exit'] as const
+export const PAUSE_ITEMS = ['resume', 'restart', 'sound', 'exit'] as const
 export type PauseItem = (typeof PAUSE_ITEMS)[number]
 
 export type ItemType = 'heart' | 'broken' | 'gold'
@@ -194,6 +194,19 @@ export function startRun(world: World): void {
 /** Dismisses a note and continues the run. */
 export function resumeRun(world: World): void {
   world.phase = 'playing'
+}
+
+/**
+ * Puts the game down: a fresh run, and the title screen back on the handheld.
+ *
+ * Called whenever the handheld goes back on the shelf. Without it the run keeps
+ * going while the thing sits there — hearts fall, notes cue, lives are lost —
+ * and picking it up again drops you into the middle of a game you had already
+ * walked away from.
+ */
+export function toTitle(world: World): void {
+  resetWorld(world)
+  world.phase = 'title'
 }
 
 /**

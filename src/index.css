@@ -248,40 +248,46 @@ body {
 
 /*
  * On a phone the card is the only thing on screen and a fingertip is the only
- * pointer, so it stops being a desktop tooltip: bigger type, and controls at the
- * 44px that a thumb can actually hit.
+ * pointer, so it stops being a desktop tooltip: it takes the whole width at the
+ * bottom of the screen, the type scales with the viewport so it is legible on
+ * anything from a small phone to a tablet, and the controls are a thumb's
+ * height rather than a mouse's.
  */
-@media (pointer: coarse), (max-width: 520px) {
+@media (pointer: coarse), (max-width: 620px) {
   .pwa {
-    right: max(12px, env(safe-area-inset-right, 0px));
-    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
-    gap: 10px;
-    max-width: min(360px, calc(100vw - 24px));
+    left: max(10px, env(safe-area-inset-left, 0px));
+    right: max(10px, env(safe-area-inset-right, 0px));
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    gap: 12px;
+    max-width: none;
+    align-items: stretch;
   }
 
   .pwa__card {
     gap: 14px;
-    padding: 13px 13px 13px 16px;
-    border-radius: 16px;
+    padding: 15px 15px 15px 18px;
+    border-radius: 18px;
   }
 
   .pwa__text {
-    font-size: 15px;
-    line-height: 1.4;
+    flex: 1;
+    font-size: clamp(16px, 4.6vw, 20px);
+    font-weight: 500;
+    line-height: 1.35;
   }
 
   .pwa__button {
-    min-height: 44px;
-    padding: 10px 18px;
-    font-size: 15px;
-    border-radius: 11px;
+    min-height: 52px;
+    padding: 12px 20px;
+    font-size: clamp(15px, 4.2vw, 19px);
+    border-radius: 14px;
   }
 
   .pwa__dismiss {
-    width: 44px;
-    height: 44px;
-    font-size: 22px;
-    border-radius: 11px;
+    width: 52px;
+    height: 52px;
+    font-size: 26px;
+    border-radius: 14px;
   }
 }
 

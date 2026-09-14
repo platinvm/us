@@ -265,6 +265,7 @@ function drawOverlay(ctx: CanvasRenderingContext2D, world: World): void {
   g.textBaseline = 'middle'
 
   const prompt = 'PRESS A'
+  const promptY = halfH - 14
 
   if (world.phase === 'title') {
     g.fillStyle = DMG.lightest
@@ -281,45 +282,56 @@ function drawOverlay(ctx: CanvasRenderingContext2D, world: World): void {
     // never actually absent.
     g.fillStyle = Math.floor(world.t * 1.6) % 2 === 0 ? DMG.lightest : DMG.light
     g.font = `bold 12px ${MONO}`
-    g.fillText(prompt, halfW / 2, 150)
+    g.fillText(prompt, halfW / 2, promptY)
   }
 
   if (world.phase === 'note') {
     g.fillStyle = DMG.lightest
     g.font = `11px ${MONO}`
     const lines = wrapText(g, world.activeNote, halfW - 28)
-    drawLines(g, lines, halfW / 2, halfH / 2 - lines.length * 7, 14)
+    // Centred in the gap between the top edge and the prompt, so a long note
+    // still cannot run into the panel's own border.
+    drawLines(
+      g,
+      lines,
+      halfW / 2,
+      blockTop(lines.length, 14, 16, promptY - 16),
+      14,
+    )
 
     g.fillStyle = DMG.light
     g.font = `bold 11px ${MONO}`
-    g.fillText(prompt, halfW / 2, halfH - 22)
+    g.fillText(prompt, halfW / 2, promptY)
   }
 
   if (world.phase === 'win') {
     g.fillStyle = DMG.lightest
-    g.font = `bold 14px ${MONO}`
-    g.fillText('HAPPY 2ND', halfW / 2, 52)
-    g.fillText('ANNIVERSARY', halfW / 2, 70)
+    g.font = `bold 13px ${MONO}`
+    g.fillText('HAPPY 2ND', halfW / 2, 24)
+    g.fillText('ANNIVERSARY', halfW / 2, 40)
 
     g.fillStyle = DMG.light
     g.font = `10px ${MONO}`
-    const lines = wrapText(g, world.finalMessage, halfW - 30)
-    drawLines(g, lines, halfW / 2, 96, 13)
+    // Wrapped a shade wider than the other panels. The message is four lines at
+    // the narrower measure, which is one line more than this screen has room
+    // for once the names, the score and the prompt have had theirs.
+    const lines = wrapText(g, world.finalMessage, halfW - 22)
+    drawLines(g, lines, halfW / 2, blockTop(lines.length, 13, 52, 96), 13)
 
     g.fillStyle = DMG.lightest
-    g.font = `bold 10px ${MONO}`
-    g.fillText(`${HER_NAME} + ${YOUR_NAME}`, halfW / 2, 146)
-    g.fillText(`SCORE ${world.score}`, halfW / 2, 160)
+    g.font = `bold 9px ${MONO}`
+    g.fillText(`${HER_NAME} + ${YOUR_NAME}`, halfW / 2, 106)
+    g.fillText(`SCORE ${world.score}`, halfW / 2, 117)
 
     g.fillStyle = DMG.light
-    g.font = `bold 11px ${MONO}`
-    g.fillText(prompt, halfW / 2, halfH - 20)
+    g.font = `bold 10px ${MONO}`
+    g.fillText(prompt, halfW / 2, 133)
   }
 
   if (world.phase === 'over') {
     g.fillStyle = DMG.lightest
     g.font = `bold 16px ${MONO}`
-    g.fillText('ALMOST', halfW / 2, 70)
+    g.fillText('ALMOST', halfW / 2, 30)
 
     g.fillStyle = DMG.light
     g.font = `10px ${MONO}`
@@ -328,27 +340,31 @@ function drawOverlay(ctx: CanvasRenderingContext2D, world: World): void {
       `${world.hearts} of ${HEARTS_TO_WIN} hearts caught, best combo x${world.bestCombo}. She would want you to try again.`,
       halfW - 30,
     )
-    drawLines(g, lines, halfW / 2, 106, 13)
+    drawLines(g, lines, halfW / 2, blockTop(lines.length, 13, 56, 104), 13)
 
     g.fillStyle = DMG.lightest
+    g.font = `bold 10px ${MONO}`
+    g.fillText(`SCORE ${world.score}`, halfW / 2, 116)
+
+    g.fillStyle = DMG.light
     g.font = `bold 11px ${MONO}`
-    g.fillText(prompt, halfW / 2, halfH - 20)
+    g.fillText(prompt, halfW / 2, promptY)
   }
 
   if (world.phase === 'paused') {
     g.fillStyle = DMG.lightest
     g.font = `bold 15px ${MONO}`
-    g.fillText('PAUSED', halfW / 2, 42)
+    g.fillText('PAUSED', halfW / 2, 28)
 
     PAUSE_ITEMS.forEach((item, index) => {
-      const y = 72 + index * 21
+      const y = 52 + index * 19
       const chosen = index === world.menuIndex
 
       // The highlight is a solid bar rather than a marker, because at this
       // size an arrow is two pixels of noise.
       if (chosen) {
         g.fillStyle = DMG.light
-        g.fillRect(34, y - 9, halfW - 68, 18)
+        g.fillRect(28, y - 8, halfW - 56, 16)
       }
 
       g.fillStyle = chosen ? DMG.darkest : DMG.light
@@ -358,11 +374,23 @@ function drawOverlay(ctx: CanvasRenderingContext2D, world: World): void {
 
     g.fillStyle = DMG.light
     g.font = `9px ${MONO}`
-    g.fillText('A SELECT   B BACK', halfW / 2, halfH - 8)
+    g.fillText('A SELECT   B BACK', halfW / 2, promptY)
   }
 
   ctx.imageSmoothingEnabled = false
   ctx.drawImage(layer.canvas, 0, 0, VIEW_W, VIEW_H)
+}
+
+/**
+ * The top of a centred block of lines.
+ *
+ * Every panel is a title, a body whose height depends on how long the words
+ * are, and a prompt pinned to the bottom. Laying the body out from its own
+ * length is what keeps the three from landing on top of each other.
+ */
+function blockTop(count: number, step: number, top: number, bottom: number): number {
+  const height = (count - 1) * step + 10
+  return top + Math.max(0, (bottom - top - height) / 2) + 5
 }
 
 /** A pause row's wording, which for sound depends on what it currently is. */

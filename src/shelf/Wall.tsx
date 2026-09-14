@@ -1,7 +1,10 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { RepeatWrapping } from 'three'
 import { SHELF, lowestDeckY } from './layout'
 import { Fairylights } from './decorations/lights'
+import { Merged } from './Merged'
+import { FINISH, box, plane } from './parts'
+import type { Part } from './parts'
 import { useCanvasTexture } from './props/canvasTexture'
 import { PRINT_SIZE, WALLPAPER_SIZE, paintPrint, paintWallpaper } from './wallpaper'
 
@@ -33,65 +36,37 @@ function Print({
     paintPrint(ctx, variant),
   )
 
+  // Frame and mount are one mesh. The sheet of glazing that used to cover the
+  // artwork is gone: a `meshPhysicalMaterial` at 7% opacity is the most
+  // expensive shader in the room, twice over, for a highlight nobody can point
+  // at. The screw under the top edge went the same way — it sat behind the
+  // frame, against the wall, and was never once drawn as anything but a pixel.
+  const parts = useMemo<Part[]>(
+    () => [
+      {
+        geometry: box(width, height, 0.03),
+        color: '#4a3626',
+        finish: FINISH.matte,
+      },
+      {
+        geometry: plane(width - 0.05, height - 0.05),
+        color: '#f4efe6',
+        at: [0, 0, 0.016],
+        finish: FINISH.sheet,
+      },
+    ],
+    [width, height],
+  )
+
   return (
     <group position={[x, y, WALL_Z + 0.012]} rotation={[0, 0, crooked]}>
-      <mesh castShadow receiveShadow>
-        <boxGeometry args={[width, height, 0.03]} />
-        <meshStandardMaterial color="#4a3626" roughness={0.7} />
-      </mesh>
-
-      <mesh position={[0, 0, 0.016]}>
-        <planeGeometry args={[width - 0.05, height - 0.05]} />
-        <meshStandardMaterial color="#f4efe6" roughness={0.9} />
-      </mesh>
+      <Merged parts={parts} />
 
       <mesh position={[0, 0, 0.0175]}>
         <planeGeometry args={[width - 0.11, height - 0.11]} />
         <meshStandardMaterial map={print} roughness={0.85} />
       </mesh>
-
-      <mesh position={[0, 0, 0.019]}>
-        <planeGeometry args={[width - 0.05, height - 0.05]} />
-        <meshPhysicalMaterial
-          color="#ffffff"
-          transparent
-          opacity={0.07}
-          roughness={0.05}
-          metalness={0.2}
-        />
-      </mesh>
-
-      <mesh position={[0, height / 2 - 0.02, -0.018]}>
-        <sphereGeometry args={[0.008, 8, 6]} />
-        <meshStandardMaterial color="#9a9aa4" metalness={0.8} roughness={0.35} />
-      </mesh>
     </group>
-  )
-}
-
-/** A strip of washi tape, holding something to the wall. */
-function Tape({
-  x,
-  y,
-  width,
-  roll,
-}: {
-  x: number
-  y: number
-  width: number
-  roll: number
-}) {
-  return (
-    <mesh position={[x, y, WALL_Z + 0.008]} rotation={[0, 0, roll]}>
-      <planeGeometry args={[width, width * 0.32]} />
-      <meshStandardMaterial
-        color="#e6d3b8"
-        transparent
-        opacity={0.72}
-        roughness={0.9}
-        side={2}
-      />
-    </mesh>
   )
 }
 
@@ -127,6 +102,26 @@ export function Wall({
 
   const floor = lowestDeckY(rows) - SHELF.bracketDrop
 
+  // Three strips of tape, in one mesh. Translucent, so it keeps a finish of
+  // its own, but three of them are still cheaper than one before.
+  const tape = useMemo<Part[]>(
+    () =>
+      [
+        { x: -2.5, y: centreY + 1.4, width: 0.17, roll: 0.42 },
+        { x: 2.42, y: centreY + 0.42, width: 0.13, roll: -0.62 },
+        { x: 1.62, y: centreY - 1.3, width: 0.14, roll: 0.28 },
+      ].map(
+        (strip): Part => ({
+          geometry: plane(strip.width, strip.width * 0.32),
+          color: '#e6d3b8',
+          at: [strip.x, strip.y, WALL_Z + 0.008],
+          rotate: [0, 0, strip.roll],
+          finish: FINISH.tape,
+        }),
+      ),
+    [centreY],
+  )
+
   return (
     <group>
       <mesh position={[0, centreY, WALL_Z]} receiveShadow>
@@ -151,9 +146,7 @@ export function Wall({
         crooked={0.04}
       />
 
-      <Tape x={-2.5} y={centreY + 1.4} width={0.17} roll={0.42} />
-      <Tape x={2.42} y={centreY + 0.42} width={0.13} roll={-0.62} />
-      <Tape x={1.62} y={centreY - 1.3} width={0.14} roll={0.28} />
+      <Merged parts={tape} castShadow={false} receiveShadow={false} />
 
       <Fairylights width={SHELF.width + 0.5} y={lightY} z={0.12} />
 

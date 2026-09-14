@@ -1,6 +1,8 @@
 import { useFrame } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
-import type { Group, Mesh, MeshStandardMaterial } from 'three'
+import type { Mesh, MeshStandardMaterial } from 'three'
+import { FINISH, mergeParts, sphere } from '../parts'
+import type { Part } from '../parts'
 
 const BULB_COUNT = 14
 
@@ -10,6 +12,12 @@ const BULB_COUNT = 14
  * The bulbs sit on the same curve the wire follows, so the two can never
  * disagree, and only the bulbs emit — one point light stands in for the whole
  * string rather than fourteen.
+ *
+ * Fourteen bulbs used to mean fourteen meshes, each with its own material,
+ * each poked once a frame to change one number. They are now two welded meshes
+ * — alternating bulbs, so the string still shimmers along its length instead of
+ * blinking as one — which gives the whole string two materials to animate.
+ * That is the same picture for a fourteenth of the work.
  */
 export function Fairylights({
   width,
@@ -20,50 +28,57 @@ export function Fairylights({
   y: number
   z: number
 }) {
-  const bulbs = useMemo(
-    () =>
-      Array.from({ length: BULB_COUNT }, (_, index) => {
-        const t = index / (BULB_COUNT - 1)
-        return {
-          key: `bulb-${index}`,
-          x: (t - 0.5) * width,
-          y: y - Math.sin(t * Math.PI) * 0.32,
-          z,
-        }
-      }),
-    [width, y, z],
-  )
+  const strands = useMemo(() => {
+    const halves: Part[][] = [[], []]
 
-  const group = useRef<Group>(null)
+    for (let index = 0; index < BULB_COUNT; index += 1) {
+      const t = index / (BULB_COUNT - 1)
+      halves[index % 2].push({
+        geometry: sphere(0.017, 10, 8),
+        color: '#ffdca6',
+        at: [(t - 0.5) * width, y - Math.sin(t * Math.PI) * 0.32, z],
+        finish: FINISH.satin,
+      })
+    }
+
+    return halves.map((parts) => mergeParts(parts)[0])
+  }, [width, y, z])
+
+  const meshes = useRef<(Mesh | null)[]>([])
 
   useFrame((state) => {
-    const node = group.current
-    if (!node) return
-
     const time = state.clock.elapsedTime
-    node.children.forEach((child, index) => {
-      const mesh = child as Mesh
-      const material = mesh.material as MeshStandardMaterial
-      if (!material || material.emissiveIntensity === undefined) return
-      material.emissiveIntensity = 1.15 + Math.sin(time * 1.4 + index * 0.9) * 0.5
+
+    // The two halves breathe out of step, which is what makes it read as a
+    // string being blown about rather than a bulb being switched.
+    meshes.current.forEach((mesh, index) => {
+      const material = mesh?.material as MeshStandardMaterial | undefined
+      if (!material) return
+      material.emissiveIntensity = 1.15 + Math.sin(time * 1.4 + index * Math.PI) * 0.5
     })
   })
 
   return (
     <group>
-      <group ref={group}>
-        {bulbs.map((bulb) => (
-          <mesh key={bulb.key} position={[bulb.x, bulb.y, bulb.z]}>
-            <sphereGeometry args={[0.017, 10, 8]} />
-            <meshStandardMaterial
-              color="#ffdca6"
-              emissive="#ffb65e"
-              emissiveIntensity={1.15}
-              roughness={0.4}
-            />
-          </mesh>
-        ))}
-      </group>
+      {strands.map((batch, index) => (
+        <mesh
+          // Not the batch's own key: both halves come out of the same finish,
+          // so they would arrive at the parent with the same name.
+          key={`strand-${index}`}
+          ref={(element) => {
+            meshes.current[index] = element
+          }}
+          geometry={batch.geometry}
+        >
+          <meshStandardMaterial
+            vertexColors
+            color="#ffffff"
+            roughness={batch.finish.roughness}
+            emissive="#ffb65e"
+            emissiveIntensity={1.15}
+          />
+        </mesh>
+      ))}
 
       <pointLight
         position={[0, y - 0.42, z + 0.3]}

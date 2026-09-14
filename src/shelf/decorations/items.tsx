@@ -1,7 +1,9 @@
 import { useFrame } from '@react-three/fiber'
-import { useEffect, useMemo, useRef } from 'react'
-import { DoubleSide } from 'three'
+import { useMemo, useRef } from 'react'
 import type { Group, PointLight } from 'three'
+import { Merged } from '../Merged'
+import { FINISH, box, capsule, cone, cylinder, disc, sphere, torus } from '../parts'
+import type { Part } from '../parts'
 import { paintPhoto } from '../props/artwork'
 import { useCanvasTexture } from '../props/canvasTexture'
 import { createHeartGeometry } from './heart'
@@ -35,109 +37,125 @@ const SPINE_RINGS = [
  * being built this way — and it is the plant that belongs on a bedroom shelf.
  */
 export function Cactus({ active }: DecorProps) {
-  const skin = active ? '#5d9a52' : '#4a8149'
-  const core = active ? '#4a8043' : '#3c6c3c'
-  const spine = active ? '#fff3cf' : '#ddd2b4'
+  /**
+   * Thirty-five meshes' worth of cactus in two.
+   *
+   * The colours are the still version of each part: what hovering used to do to
+   * a part's colour is now a light coming on inside the whole plant, which is
+   * cheaper and reads more like a poke than a repaint did.
+   */
+  const parts = useMemo<Part[]>(() => {
+    const plant: Part[] = [
+      // Body: a plain core with nine slimmer capsules standing around it. The
+      // ring of them is what makes the ribs — a single tube reads as a
+      // cucumber however it is shaded.
+      {
+        geometry: capsule(0.05, 0.15, 6, 20),
+        color: '#3c6c3c',
+        at: [0, 0.255, 0],
+        finish: FINISH.satin,
+      },
 
-  return (
-    <group>
-      {/* Saucer, pot, rim, soil */}
-      <mesh position={[0, 0.008, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.104, 0.096, 0.016, 24]} />
-        <meshStandardMaterial color="#a4593c" roughness={0.86} />
-      </mesh>
+      ...Array.from(
+        { length: RIBS },
+        (_, index): Part => {
+          const angle = (index / RIBS) * Math.PI * 2
+          return {
+            geometry: capsule(0.021, 0.185, 4, 12),
+            color: '#4a8149',
+            at: [Math.sin(angle) * 0.048, 0.25, Math.cos(angle) * 0.048],
+            finish: FINISH.satin,
+          }
+        },
+      ),
 
-      <mesh position={[0, 0.07, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.088, 0.066, 0.114, 24]} />
-        <meshStandardMaterial color="#bc6a46" roughness={0.82} />
-      </mesh>
+      // One arm: a stub out of the side, then a stub back up beside it.
+      {
+        geometry: capsule(0.024, 0.05, 4, 14),
+        color: '#3c6c3c',
+        at: [-0.062, 0.255, 0],
+        rotate: [0, 0, Math.PI / 2],
+        finish: FINISH.satin,
+      },
+      {
+        geometry: capsule(0.024, 0.09, 4, 14),
+        color: '#4a8149',
+        at: [-0.098, 0.3, 0],
+        finish: FINISH.satin,
+      },
 
-      <mesh position={[0, 0.132, 0]} castShadow>
-        <cylinderGeometry args={[0.093, 0.093, 0.024, 24]} />
-        <meshStandardMaterial color="#c97a52" roughness={0.74} />
-      </mesh>
+      // Spines, in two rings round the ribs.
+      ...SPINE_RINGS.flatMap((ring) =>
+        Array.from(
+          { length: ring.count },
+          (_, index): Part => ({
+            geometry: cone(0.004, 0.014, 5),
+            color: '#ddd2b4',
+            spin: ((index + ring.offset) / ring.count) * Math.PI * 2,
+            offset: [0.07, ring.y, 0],
+            rotate: [0, 0, -Math.PI / 2],
+            finish: FINISH.satin,
+          }),
+        ),
+      ),
 
-      <mesh position={[0, 0.139, 0]}>
-        <cylinderGeometry args={[0.078, 0.078, 0.02, 20]} />
-        <meshStandardMaterial color="#37271b" roughness={1} />
-      </mesh>
-
-      {/* Body: a plain core with nine slimmer capsules standing around it. The
-          ring of them is what makes the ribs — a single tube reads as a
-          cucumber however it is shaded. */}
-      <mesh position={[0, 0.255, 0]} castShadow>
-        <capsuleGeometry args={[0.05, 0.15, 6, 20]} />
-        <meshStandardMaterial color={core} roughness={0.74} />
-      </mesh>
-
-      {Array.from({ length: RIBS }, (_, index) => {
-        const angle = (index / RIBS) * Math.PI * 2
-        return (
-          <mesh
-            key={`rib-${index}`}
-            position={[Math.sin(angle) * 0.048, 0.25, Math.cos(angle) * 0.048]}
-            castShadow
-          >
-            <capsuleGeometry args={[0.021, 0.185, 4, 12]} />
-            <meshStandardMaterial color={skin} roughness={0.66} />
-          </mesh>
-        )
-      })}
-
-      {/* One arm: a stub out of the side, then a stub back up beside it. */}
-      <mesh position={[-0.062, 0.255, 0]} rotation={[0, 0, Math.PI / 2]} castShadow>
-        <capsuleGeometry args={[0.024, 0.05, 4, 14]} />
-        <meshStandardMaterial color={core} roughness={0.68} />
-      </mesh>
-
-      <mesh position={[-0.098, 0.3, 0]} castShadow>
-        <capsuleGeometry args={[0.024, 0.09, 4, 14]} />
-        <meshStandardMaterial color={skin} roughness={0.66} />
-      </mesh>
-
-      {SPINE_RINGS.flatMap((ring) =>
-        Array.from({ length: ring.count }, (_, index) => {
-          const angle = ((index + ring.offset) / ring.count) * Math.PI * 2
-          return (
-            <group key={`spine-${ring.y}-${index}`} rotation={[0, angle, 0]}>
-              <mesh position={[0.07, ring.y, 0]} rotation={[0, 0, -Math.PI / 2]}>
-                <coneGeometry args={[0.004, 0.014, 5]} />
-                <meshStandardMaterial color={spine} roughness={0.55} />
-              </mesh>
-            </group>
-          )
-        }),
-      )}
-
-      {/* One small flower, because a cactus with a flower on it is the whole
-          reason to keep a cactus. */}
-      <group position={[0.014, 0.383, 0.01]}>
-        {Array.from({ length: 6 }, (_, index) => {
+      // One small flower, because a cactus with a flower on it is the whole
+      // reason to keep a cactus.
+      ...Array.from(
+        { length: 6 },
+        (_, index): Part => {
           const angle = (index / 6) * Math.PI * 2
-          return (
-            <mesh
-              key={`petal-${index}`}
-              position={[Math.sin(angle) * 0.016, 0, Math.cos(angle) * 0.016]}
-              scale={[1, 0.7, 1]}
-            >
-              <sphereGeometry args={[0.014, 10, 8]} />
-              <meshStandardMaterial
-                color={active ? '#ff9ec6' : '#ee7fae'}
-                roughness={0.5}
-                emissive={active ? '#ff6ba8' : '#000000'}
-                emissiveIntensity={active ? 0.45 : 0}
-              />
-            </mesh>
-          )
-        })}
+          return {
+            geometry: sphere(0.014, 10, 8),
+            color: '#ee7fae',
+            at: [0.014, 0.383, 0.01],
+            spin: angle,
+            offset: [Math.sin(angle) * 0.016, 0, Math.cos(angle) * 0.016],
+            scale: [1, 0.7, 1],
+            finish: FINISH.satin,
+          }
+        },
+      ),
+      {
+        geometry: sphere(0.011, 10, 8),
+        color: '#f2c45a',
+        at: [0.014, 0.383, 0.01],
+        finish: FINISH.satin,
+      },
+    ]
 
-        <mesh>
-          <sphereGeometry args={[0.011, 10, 8]} />
-          <meshStandardMaterial color="#f2c45a" roughness={0.6} />
-        </mesh>
-      </group>
-    </group>
-  )
+    return [
+      // Saucer, pot, rim, soil
+      {
+        geometry: cylinder(0.104, 0.096, 0.016, 24),
+        color: '#a4593c',
+        at: [0, 0.008, 0],
+        finish: FINISH.matte,
+      },
+      {
+        geometry: cylinder(0.088, 0.066, 0.114, 24),
+        color: '#bc6a46',
+        at: [0, 0.07, 0],
+        finish: FINISH.matte,
+      },
+      {
+        geometry: cylinder(0.093, 0.093, 0.024, 24),
+        color: '#c97a52',
+        at: [0, 0.132, 0],
+        finish: FINISH.matte,
+      },
+      {
+        geometry: cylinder(0.078, 0.078, 0.02, 20),
+        color: '#37271b',
+        at: [0, 0.139, 0],
+        finish: FINISH.matte,
+      },
+
+      ...plant,
+    ]
+  }, [])
+
+  return <Merged parts={parts} active={active} glow="#8ed08a" />
 }
 
 /* ------------------------------------------------------------------ books */
@@ -149,40 +167,49 @@ const BOOKS = [
 ]
 
 export function Books({ active }: DecorProps) {
-  let y = 0
-  return (
-    <group>
-      {BOOKS.map((book, index) => {
-        const base = y
-        y += book.h + 0.01
-        return (
-          <group
-            key={`book-${index}`}
-            position={[0, base, 0]}
-            rotation={[0, book.rot, 0]}
-          >
-            <mesh position={[0, 0.004, 0]} castShadow>
-              <boxGeometry args={[book.w, 0.008, book.d]} />
-              <meshStandardMaterial color={book.color} roughness={0.78} />
-            </mesh>
-            <mesh position={[0, 0.008 + book.h / 2, 0.004]}>
-              <boxGeometry args={[book.w - 0.014, book.h, book.d - 0.016]} />
-              <meshStandardMaterial color="#efe6d2" roughness={0.9} />
-            </mesh>
-            <mesh position={[0, 0.008 + book.h, 0]} castShadow>
-              <boxGeometry args={[book.w, 0.008, book.d]} />
-              <meshStandardMaterial
-                color={book.color}
-                roughness={0.72}
-                emissive={active ? book.color : '#000000'}
-                emissiveIntensity={active ? 0.18 : 0}
-              />
-            </mesh>
-          </group>
-        )
-      })}
-    </group>
-  )
+  // Three books, nine meshes, one now: the boards, the block of pages and the
+  // jacket are all the same matte stock at different shades.
+  const parts = useMemo<Part[]>(() => {
+    let y = 0
+
+    return BOOKS.flatMap((book): Part[] => {
+      const base = y
+      y += book.h + 0.01
+
+      // Every part of one book shares the book's turn about the vertical, which
+      // is what `spin` is for.
+      const at: [number, number, number] = [0, base, 0]
+
+      return [
+        {
+          geometry: box(book.w, 0.008, book.d),
+          color: book.color,
+          at,
+          spin: book.rot,
+          offset: [0, 0.004, 0],
+          finish: FINISH.matte,
+        },
+        {
+          geometry: box(book.w - 0.014, book.h, book.d - 0.016),
+          color: '#efe6d2',
+          at,
+          spin: book.rot,
+          offset: [0, 0.008 + book.h / 2, 0.004],
+          finish: FINISH.matte,
+        },
+        {
+          geometry: box(book.w, 0.008, book.d),
+          color: book.color,
+          at,
+          spin: book.rot,
+          offset: [0, 0.008 + book.h, 0],
+          finish: FINISH.matte,
+        },
+      ]
+    })
+  }, [])
+
+  return <Merged parts={parts} active={active} glow="#ffe3b0" />
 }
 
 /* ----------------------------------------------------------------- candle */
@@ -261,47 +288,67 @@ const KEYS = [
 ]
 
 export function KeyRing({ active }: DecorProps) {
-  const brass = active ? '#f0c268' : '#c9a24a'
+  // The dish is one mesh, the ring and every key on it are another.
+  const parts = useMemo<Part[]>(() => {
+    const at: [number, number, number] = [0, 0.028, 0]
 
-  return (
-    <group>
-      {/* The little dish they are dropped into */}
-      <mesh position={[0, 0.012, 0]} receiveShadow>
-        <cylinderGeometry args={[0.095, 0.075, 0.024, 24]} />
-        <meshStandardMaterial color="#efe8dc" roughness={0.45} />
-      </mesh>
+    return [
+      // The little dish they are dropped into.
+      {
+        geometry: cylinder(0.095, 0.075, 0.024, 24),
+        color: '#efe8dc',
+        at: [0, 0.012, 0],
+        finish: FINISH.satin,
+      },
 
-      <group position={[0, 0.028, 0]}>
-        <mesh rotation={[-Math.PI / 2, 0, 0]}>
-          <torusGeometry args={[0.045, 0.006, 8, 28]} />
-          <meshStandardMaterial color={brass} metalness={0.95} roughness={0.25} />
-        </mesh>
+      {
+        geometry: torus(0.045, 0.006, 8, 28),
+        color: '#c9a24a',
+        at,
+        rotate: [-Math.PI / 2, 0, 0],
+        finish: FINISH.metal,
+      },
 
-        {KEYS.map((key, index) => (
-          <group key={`key-${index}`} rotation={[0, key.angle, 0]}>
-            <mesh position={[key.len / 2 + 0.04, 0.004, 0]} rotation={[0, 0, 0]}>
-              <boxGeometry args={[key.len, 0.005, 0.011]} />
-              <meshStandardMaterial color={brass} metalness={0.9} roughness={0.3} />
-            </mesh>
+      ...KEYS.flatMap(
+        (key): Part[] => [
+          {
+            geometry: box(key.len, 0.005, 0.011),
+            color: '#c9a24a',
+            at,
+            spin: key.angle,
+            offset: [key.len / 2 + 0.04, 0.004, 0],
+            finish: FINISH.metal,
+          },
+          {
+            geometry: torus(0.015, 0.004, 6, 16),
+            color: '#c9a24a',
+            at,
+            spin: key.angle,
+            offset: [0.036, 0.004, 0],
+            finish: FINISH.metal,
+          },
+          {
+            geometry: box(0.018, 0.005, 0.008),
+            color: '#c9a24a',
+            at,
+            spin: key.angle,
+            offset: [key.len + 0.028, 0.004, 0.008],
+            finish: FINISH.metal,
+          },
+          {
+            geometry: box(0.012, 0.005, 0.008),
+            color: '#c9a24a',
+            at,
+            spin: key.angle,
+            offset: [key.len + 0.016, 0.004, -0.008],
+            finish: FINISH.metal,
+          },
+        ],
+      ),
+    ]
+  }, [])
 
-            <mesh position={[0.036, 0.004, 0]}>
-              <torusGeometry args={[0.015, 0.004, 6, 16]} />
-              <meshStandardMaterial color={brass} metalness={0.9} roughness={0.3} />
-            </mesh>
-
-            <mesh position={[key.len + 0.028, 0.004, 0.008]}>
-              <boxGeometry args={[0.018, 0.005, 0.008]} />
-              <meshStandardMaterial color={brass} metalness={0.9} roughness={0.3} />
-            </mesh>
-            <mesh position={[key.len + 0.016, 0.004, -0.008]}>
-              <boxGeometry args={[0.012, 0.005, 0.008]} />
-              <meshStandardMaterial color={brass} metalness={0.9} roughness={0.3} />
-            </mesh>
-          </group>
-        ))}
-      </group>
-    </group>
-  )
+  return <Merged parts={parts} active={active} glow="#ffe6ab" />
 }
 
 /* ------------------------------------------------------------------ clock */
@@ -316,76 +363,92 @@ const TICKS = [0, 1, 2, 3].map((index) => (index * Math.PI) / 2)
  * it just ends up where there is room.
  */
 export function Clock({ active }: DecorProps) {
-  const brass = active ? '#f0cd6a' : '#c9a227'
+  // Twelve meshes in three: the dull stock, the satin case, the brass.
+  const parts = useMemo<Part[]>(() => {
+    const brassAt = (x: number, y: number, z: number): [number, number, number] => [x, y, z]
 
-  return (
-    <group>
-      {/* Case: a squashed cylinder facing forward */}
-      <mesh position={[0, 0.115, 0.005]} rotation={[Math.PI / 2, 0, 0]} castShadow>
-        <cylinderGeometry args={[0.105, 0.105, 0.052, 28]} />
-        <meshStandardMaterial color="#e6ddc9" roughness={0.45} metalness={0.1} />
-      </mesh>
+    return [
+      // Case: a squashed cylinder facing forward.
+      {
+        geometry: cylinder(0.105, 0.105, 0.052, 28),
+        color: '#e6ddc9',
+        at: [0, 0.115, 0.005],
+        rotate: [Math.PI / 2, 0, 0],
+        finish: FINISH.satin,
+      },
 
-      {/* Face and bezel. The torus is left in its default orientation, which
-          already faces forward — turning it on edge put a hoop round the case. */}
-      <mesh position={[0, 0.115, 0.032]}>
-        <circleGeometry args={[0.092, 28]} />
-        <meshStandardMaterial color="#fdfaf0" roughness={0.85} />
-      </mesh>
+      // Face and bezel. The torus is left in its default orientation, which
+      // already faces forward — turning it on edge put a hoop round the case.
+      {
+        geometry: disc(0.092, 28),
+        color: '#fdfaf0',
+        at: [0, 0.115, 0.032],
+        finish: FINISH.matte,
+      },
+      {
+        geometry: torus(0.097, 0.008, 8, 32),
+        color: '#c9a227',
+        at: [0, 0.115, 0.03],
+        finish: FINISH.metal,
+      },
 
-      <mesh position={[0, 0.115, 0.03]}>
-        <torusGeometry args={[0.097, 0.008, 8, 32]} />
-        <meshStandardMaterial color={brass} metalness={0.85} roughness={0.28} />
-      </mesh>
+      ...TICKS.map(
+        (angle): Part => ({
+          geometry: box(0.006, 0.016, 0.003),
+          color: '#6b6252',
+          at: [Math.sin(angle) * 0.074, 0.115 + Math.cos(angle) * 0.074, 0.035],
+          rotate: [0, 0, -angle],
+          finish: FINISH.matte,
+        }),
+      ),
 
-      {TICKS.map((angle) => (
-        <mesh
-          key={`tick-${angle}`}
-          position={[Math.sin(angle) * 0.074, 0.115 + Math.cos(angle) * 0.074, 0.035]}
-          rotation={[0, 0, -angle]}
-        >
-          <boxGeometry args={[0.006, 0.016, 0.003]} />
-          <meshStandardMaterial color="#6b6252" roughness={0.7} />
-        </mesh>
-      ))}
+      // Ten past ten.
+      {
+        geometry: box(0.006, 0.06, 0.003),
+        color: '#3b3630',
+        at: [0, 0.115, 0.036],
+        spin: 0.52,
+        offset: [0, 0.03, 0],
+        finish: FINISH.satin,
+      },
+      {
+        geometry: box(0.007, 0.044, 0.003),
+        color: '#3b3630',
+        at: [0, 0.115, 0.036],
+        spin: -0.61,
+        offset: [0, 0.022, 0],
+        finish: FINISH.satin,
+      },
 
-      {/* Ten past ten */}
-      <group position={[0, 0.115, 0.036]} rotation={[0, 0, 0.52]}>
-        <mesh position={[0, 0.03, 0]}>
-          <boxGeometry args={[0.006, 0.06, 0.003]} />
-          <meshStandardMaterial color="#3b3630" roughness={0.6} />
-        </mesh>
-      </group>
+      // Two feet, so it stands on the plank rather than floating.
+      ...[-0.062, 0.062].map(
+        (x): Part => ({
+          geometry: cylinder(0.013, 0.013, 0.04, 10),
+          color: '#c9a227',
+          at: brassAt(x, 0.02, 0.008),
+          finish: FINISH.metal,
+        }),
+      ),
 
-      <group position={[0, 0.115, 0.036]} rotation={[0, 0, -0.61]}>
-        <mesh position={[0, 0.022, 0]}>
-          <boxGeometry args={[0.007, 0.044, 0.003]} />
-          <meshStandardMaterial color="#3b3630" roughness={0.6} />
-        </mesh>
-      </group>
+      // Bells on top.
+      ...[-0.045, 0.045].map(
+        (x): Part => ({
+          geometry: sphere(0.022, 14, 10),
+          color: '#c9a227',
+          at: [x, 0.22, 0],
+          finish: FINISH.metal,
+        }),
+      ),
+      {
+        geometry: cylinder(0.008, 0.008, 0.016, 10),
+        color: '#c9a227',
+        at: [0, 0.232, 0],
+        finish: FINISH.metal,
+      },
+    ]
+  }, [])
 
-      {/* Two feet, so it stands on the plank rather than floating */}
-      {[-0.062, 0.062].map((x) => (
-        <mesh key={`foot-${x}`} position={[x, 0.02, 0.008]} castShadow>
-          <cylinderGeometry args={[0.013, 0.013, 0.04, 10]} />
-          <meshStandardMaterial color={brass} metalness={0.8} roughness={0.35} />
-        </mesh>
-      ))}
-
-      {/* Bells on top */}
-      {[-0.045, 0.045].map((x) => (
-        <mesh key={`bell-${x}`} position={[x, 0.22, 0]} castShadow>
-          <sphereGeometry args={[0.022, 14, 10]} />
-          <meshStandardMaterial color={brass} metalness={0.85} roughness={0.3} />
-        </mesh>
-      ))}
-
-      <mesh position={[0, 0.232, 0]}>
-        <cylinderGeometry args={[0.008, 0.008, 0.016, 10]} />
-        <meshStandardMaterial color={brass} metalness={0.85} roughness={0.3} />
-      </mesh>
-    </group>
-  )
+  return <Merged parts={parts} active={active} glow="#ffe6ab" />
 }
 
 /* -------------------------------------------------------------- heartsjar */
@@ -400,62 +463,48 @@ const JAR_HEARTS = [
 ]
 
 export function HeartsJar({ active }: DecorProps) {
-  const geometry = useMemo(() => createHeartGeometry(1, 0.3), [])
+  // Glass, hearts and lid: three meshes, and the hearts keep a light of their
+  // own because being lit from inside is the whole point of them.
+  const parts = useMemo<Part[]>(() => {
+    const heart = createHeartGeometry(1, 0.3)
 
-  useEffect(() => () => geometry.dispose(), [geometry])
+    return [
+      // Barely-there glass, drawn from both sides because it is a shell.
+      {
+        geometry: cylinder(0.096, 0.088, 0.2, 24, 1, true),
+        color: '#cfe6f2',
+        at: [0, 0.105, 0],
+        finish: FINISH.glass,
+      },
+      {
+        geometry: cylinder(0.088, 0.088, 0.012, 24),
+        color: '#cfe6f2',
+        at: [0, 0.006, 0],
+        finish: FINISH.glass,
+      },
 
-  return (
-    <group>
-      {/* Glass */}
-      <mesh position={[0, 0.105, 0]} castShadow>
-        <cylinderGeometry args={[0.096, 0.088, 0.2, 24, 1, true]} />
-        <meshStandardMaterial
-          color="#cfe6f2"
-          roughness={0.06}
-          metalness={0.05}
-          transparent
-          opacity={0.22}
-          side={DoubleSide}
-          depthWrite={false}
-        />
-      </mesh>
+      // The hearts. Each needs its own copy, because the merge consumes them.
+      ...JAR_HEARTS.map(
+        (jarHeart): Part => ({
+          geometry: heart.clone(),
+          color: jarHeart.color,
+          at: [jarHeart.x, jarHeart.y, jarHeart.z],
+          rotate: [Math.PI, jarHeart.rot, 0],
+          scale: jarHeart.size,
+          finish: FINISH.ember,
+        }),
+      ),
 
-      <mesh position={[0, 0.006, 0]}>
-        <cylinderGeometry args={[0.088, 0.088, 0.012, 24]} />
-        <meshStandardMaterial
-          color="#cfe6f2"
-          roughness={0.08}
-          transparent
-          opacity={0.3}
-          depthWrite={false}
-        />
-      </mesh>
+      {
+        geometry: cylinder(0.1, 0.1, 0.026, 24),
+        color: '#c9a24a',
+        at: [0, 0.218, 0],
+        finish: FINISH.metal,
+      },
+    ]
+  }, [])
 
-      {/* Hearts */}
-      {JAR_HEARTS.map((heart, index) => (
-        <mesh
-          key={`heart-${index}`}
-          geometry={geometry}
-          position={[heart.x, heart.y, heart.z]}
-          rotation={[Math.PI, heart.rot, 0]}
-          scale={heart.size}
-        >
-          <meshStandardMaterial
-            color={heart.color}
-            roughness={0.45}
-            emissive={heart.color}
-            emissiveIntensity={active ? 0.28 : 0.06}
-          />
-        </mesh>
-      ))}
-
-      {/* Lid */}
-      <mesh position={[0, 0.218, 0]} castShadow>
-        <cylinderGeometry args={[0.1, 0.1, 0.026, 24]} />
-        <meshStandardMaterial color="#c9a24a" metalness={0.92} roughness={0.3} />
-      </mesh>
-    </group>
-  )
+  return <Merged parts={parts} active={active} glow="#ffd9a8" />
 }
 
 /* --------------------------------------------------------------- polaroid */
@@ -495,54 +544,59 @@ export function Polaroid({ active }: DecorProps) {
 /* ------------------------------------------------------------- succulent */
 
 export function Succulent({ active }: DecorProps) {
-  const petals = Array.from({ length: 10 }, (_, index) => {
-    const ring = index < 6 ? 0 : 1
-    const perRing = ring === 0 ? 6 : 4
-    const angle = ((index % perRing) / perRing) * Math.PI * 2 + ring * 0.5
-    const radius = ring === 0 ? 0.026 : 0.05
-    const tilt = ring === 0 ? 0.75 : 1.15
-    return { angle, radius, tilt, key: `petal-${index}` }
-  })
+  // Pot, soil and the two rings of leaves, in two meshes.
+  const parts = useMemo<Part[]>(() => {
+    const petals = Array.from({ length: 10 }, (_, index) => {
+      const ring = index < 6 ? 0 : 1
+      const perRing = ring === 0 ? 6 : 4
+      return {
+        angle: ((index % perRing) / perRing) * Math.PI * 2 + ring * 0.5,
+        radius: ring === 0 ? 0.026 : 0.05,
+        tilt: ring === 0 ? 0.75 : 1.15,
+      }
+    })
 
-  return (
-    <group>
-      <mesh position={[0, 0.05, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.058, 0.046, 0.1, 18]} />
-        <meshStandardMaterial color="#c98e77" roughness={0.85} />
-      </mesh>
+    return [
+      {
+        geometry: cylinder(0.058, 0.046, 0.1, 18),
+        color: '#c98e77',
+        at: [0, 0.05, 0],
+        finish: FINISH.matte,
+      },
+      {
+        geometry: cylinder(0.061, 0.061, 0.014, 18),
+        color: '#d6a189',
+        at: [0, 0.103, 0],
+        finish: FINISH.matte,
+      },
+      {
+        geometry: cylinder(0.052, 0.052, 0.014, 14),
+        color: '#3b2c22',
+        at: [0, 0.108, 0],
+        finish: FINISH.matte,
+      },
 
-      <mesh position={[0, 0.103, 0]}>
-        <cylinderGeometry args={[0.061, 0.061, 0.014, 18]} />
-        <meshStandardMaterial color="#d6a189" roughness={0.75} />
-      </mesh>
+      ...petals.map(
+        (petal): Part => ({
+          geometry: sphere(1, 10, 8),
+          color: '#5f9c72',
+          spin: petal.angle,
+          offset: [0, 0.13, petal.radius],
+          rotate: [petal.tilt, 0, 0],
+          scale: [0.026, 0.03, 0.014],
+          finish: FINISH.satin,
+        }),
+      ),
 
-      <mesh position={[0, 0.108, 0]}>
-        <cylinderGeometry args={[0.052, 0.052, 0.014, 14]} />
-        <meshStandardMaterial color="#3b2c22" roughness={1} />
-      </mesh>
+      {
+        geometry: sphere(1, 10, 8),
+        color: '#7cb389',
+        at: [0, 0.142, 0],
+        scale: [0.022, 0.024, 0.022],
+        finish: FINISH.satin,
+      },
+    ]
+  }, [])
 
-      {petals.map((petal) => (
-        <group key={petal.key} rotation={[0, petal.angle, 0]}>
-          <mesh
-            position={[0, 0.13, petal.radius]}
-            rotation={[petal.tilt, 0, 0]}
-            scale={[0.026, 0.03, 0.014]}
-          >
-            <sphereGeometry args={[1, 10, 8]} />
-            <meshStandardMaterial
-              color={active ? '#7fb98a' : '#5f9c72'}
-              roughness={0.5}
-              emissive={active ? '#3f7a52' : '#000000'}
-              emissiveIntensity={active ? 0.45 : 0}
-            />
-          </mesh>
-        </group>
-      ))}
-
-      <mesh position={[0, 0.142, 0]} scale={[0.022, 0.024, 0.022]}>
-        <sphereGeometry args={[1, 10, 8]} />
-        <meshStandardMaterial color={active ? '#9ccfa4' : '#7cb389'} roughness={0.45} />
-      </mesh>
-    </group>
-  )
+  return <Merged parts={parts} active={active} glow="#a8dda9" />
 }

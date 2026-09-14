@@ -1,7 +1,7 @@
 import { RoundedBox, useCursor } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CanvasTexture, SRGBColorSpace } from 'three'
+import { CanvasTexture, LinearFilter, LinearMipmapLinearFilter, SRGBColorSpace } from 'three'
 import type { Group } from 'three'
 import { NOTES, VIEW_H, VIEW_W } from '../../games/heartcatcher/config'
 import { createAudioBus } from '../../games/heartcatcher/engine/audio'
@@ -16,12 +16,22 @@ import {
   resumeRun,
   selectedItem,
   startRun,
+  toTitle,
   update,
 } from '../../games/heartcatcher/engine/step'
 import type { Input, World } from '../../games/heartcatcher/engine/step'
 import type { ShelfPropProps } from '../../games/types'
 import { useShelf } from '../shelfState'
 import { useCanvasTexture } from './canvasTexture'
+
+/**
+ * How often the screen repaints while the handheld is sitting on the shelf.
+ *
+ * Twelve times a second: enough that the attract screen is visibly alive from
+ * across the room, cheap enough that nobody pays for a run that is not being
+ * watched. In your hands it goes back to every frame.
+ */
+const IDLE_SCREEN_INTERVAL = 1 / 12
 
 /*
  * The shell. Everything below is placed relative to `FACE`, the plane of the
@@ -142,6 +152,20 @@ export function GameBoy({ focused, hovered }: ShelfPropProps) {
 
   useEffect(() => () => screen.texture.dispose(), [screen])
 
+  /**
+   * The mip chain is only worth building when the screen is small.
+   *
+   * On the shelf it is a few dozen pixels across and wants the pyramid, or the
+   * pixel art crawls. Held up in front of you it is magnified, where the mip
+   * chain is not read at all — and rebuilding one on every frame of a running
+   * game cost more than drawing the game did.
+   */
+  useEffect(() => {
+    screen.texture.generateMipmaps = !focused
+    screen.texture.minFilter = focused ? LinearFilter : LinearMipmapLinearFilter
+    screen.texture.needsUpdate = true
+  }, [focused, screen])
+
   /* ----------------------------------------------------------------- audio */
 
   useEffect(() => {
@@ -162,9 +186,13 @@ export function GameBoy({ focused, hovered }: ShelfPropProps) {
   /** Does whatever the highlighted pause row says. */
   const choosePauseItem = useCallback(() => {
     const item = selectedItem(world)
-    // Exit is the same thing Escape does: the handheld goes back on the shelf.
+    // Exit is the same thing Escape does: the handheld goes back on the shelf,
+    // which resets the run on its way out.
     if (item === 'exit') release()
     else if (item === 'sound') toggleSound()
+    // Restart deals a fresh run and drops straight back into play, which is
+    // what you want after losing the last life on a note you have already read.
+    else if (item === 'restart') startRun(world)
     else closeMenu(world)
   }, [world, release, toggleSound])
 
@@ -192,6 +220,8 @@ export function GameBoy({ focused, hovered }: ShelfPropProps) {
   }
 
   /* ------------------------------------------------------------- one frame */
+
+  const screenClock = useRef(0)
 
   useFrame((state, delta) => {
     const dt = Math.min(0.05, delta)
@@ -226,8 +256,16 @@ export function GameBoy({ focused, hovered }: ShelfPropProps) {
       }
     }
 
-    render(screen.ctx, world)
-    screen.texture.needsUpdate = true
+    // The simulation always advances — the attract screen has stars to blink
+    // and a prompt to flash — but the picture and its upload are rationed
+    // while the handheld is on the shelf. A game nobody is holding does not
+    // need sixty new frames a second of a screen the size of a stamp.
+    screenClock.current += dt
+    if (focused || screenClock.current >= IDLE_SCREEN_INTERVAL) {
+      screenClock.current = 0
+      render(screen.ctx, world)
+      screen.texture.needsUpdate = true
+    }
 
     if (shell.current) {
       const time = state.clock.elapsedTime
@@ -242,8 +280,10 @@ export function GameBoy({ focused, hovered }: ShelfPropProps) {
     if (!focused) {
       heldKeys.current.clear()
       padDir.current = 0
-      // The shelf has it back; nothing should be left sitting on a menu.
-      closeMenu(world)
+      // The shelf has it back, so the run is over and the attract screen goes
+      // back on. Leaving the world mid-run was what let a game carry on playing
+      // itself, out of sight, on the shelf.
+      toTitle(world)
       return
     }
 
