@@ -13,15 +13,14 @@ export const YOUR_NAME = 'Me'
  * game paces itself to however many you write.
  */
 export const NOTES: string[] = [
-  "Two years ago I was hoping you'd text back. You did. Everything good started there.",
-  'You laugh at your own jokes before you finish them. It is my favourite sound.',
-  'Boring Tuesdays stopped being boring somewhere around you.',
-  'I would pick you again today, and tomorrow, and on all the days I am bad at texting.',
+  "Two years ago I wasn't expecting us to become something. You did. Everything good started there.",
+  'Our cuddles are the best cuddles in the world.',
+  'Hard times never stopped us and they never will.',
+  'I would pick you again today, and tomorrow, and on all the days I am bad at texting (everyday).',
 ]
 
 /** The big one, shown when she wins. */
-export const FINAL_MESSAGE =
-  'Happy second anniversary. Thank you for catching me too.'
+export const FINAL_MESSAGE = 'Happy second anniversary. I love you!'
 
 /* ========================================================================== */
 
