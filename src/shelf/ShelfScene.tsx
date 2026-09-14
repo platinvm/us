@@ -16,6 +16,7 @@ import { ShelfSlot } from './ShelfSlot'
 import { useShelf } from './shelfState'
 import { ShelfUnit } from './ShelfUnit'
 import { useSceneQuality } from './useSceneQuality'
+import { ViewGestures } from './viewGestures'
 import { Wall } from './Wall'
 
 /**
@@ -200,6 +201,7 @@ export function ShelfScene() {
 
       <ResolutionGovernor min={quality.dprMin} max={ceiling} enabled={!idle} />
       <FramePacer fps={fps} />
+      <ViewGestures />
       <ShadowBudget />
 
       <ambientLight intensity={0.38} color="#c9b6e0" />
