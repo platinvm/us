@@ -35,11 +35,13 @@ export function useSceneQuality(): SceneQuality {
 
     return touchFirst
       ? {
-          // Never render above 1.25x on a phone. The difference between that
-          // and 1.5x is 40% of the pixels in every frame, and at arm's length
-          // on a small screen nobody can tell the two apart.
+          // Starts where the old fixed budget was, and is walked down from here
+          // by `ResolutionGovernor` if this particular phone cannot hold the
+          // frame rate at it. Capping it lower up front would make every phone
+          // — including the ones with nothing wrong with them — softer than
+          // the shelf used to be.
           dprMin: 0.7,
-          dprMax: 1.25,
+          dprMax: 1.5,
           antialias: false,
           shadowMapSize: 1024,
           idleFps: 30,
