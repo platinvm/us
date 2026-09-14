@@ -1,0 +1,46 @@
+name: Release
+
+# `git tag v1.0.0 && git push --tags` publishes a zip of the built site and the
+# notes that go with it.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Publish the built site
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        env:
+          # The zip is meant to be dropped anywhere, but the copy on Pages
+          # lives under /<repo>/, so that is what it is built for.
+          BASE_PATH: /${{ github.event.repository.name }}/
+        run: npm run build
+
+      # `dist` is everything: the app, its fonts and card art, the manifest and
+      # the service worker. Unzip it behind any static host and it runs offline
+      # from the first load.
+      - name: Zip the site
+        run: cd dist && zip -qr "../us-${GITHUB_REF_NAME}.zip" .
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" \
+            "us-${GITHUB_REF_NAME}.zip" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes
