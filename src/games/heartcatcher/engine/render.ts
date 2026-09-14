@@ -9,8 +9,8 @@ import {
   VIEW_W,
 } from '../config'
 import { BROKEN, HEART, MOON, PLAYER, drawNumber, drawSprite } from './sprites'
-import { PLAYER_Y } from './step'
-import type { World } from './step'
+import { PAUSE_ITEMS, PLAYER_Y } from './step'
+import type { PauseItem, World } from './step'
 import { drawLines, halfCanvas, wrapText } from './text'
 
 /**
@@ -335,8 +335,40 @@ function drawOverlay(ctx: CanvasRenderingContext2D, world: World): void {
     g.fillText(prompt, halfW / 2, halfH - 20)
   }
 
+  if (world.phase === 'paused') {
+    g.fillStyle = DMG.lightest
+    g.font = `bold 15px ${MONO}`
+    g.fillText('PAUSED', halfW / 2, 42)
+
+    PAUSE_ITEMS.forEach((item, index) => {
+      const y = 72 + index * 21
+      const chosen = index === world.menuIndex
+
+      // The highlight is a solid bar rather than a marker, because at this
+      // size an arrow is two pixels of noise.
+      if (chosen) {
+        g.fillStyle = DMG.light
+        g.fillRect(34, y - 9, halfW - 68, 18)
+      }
+
+      g.fillStyle = chosen ? DMG.darkest : DMG.light
+      g.font = `${chosen ? 'bold ' : ''}12px ${MONO}`
+      g.fillText(pauseLabel(item, world), halfW / 2, y)
+    })
+
+    g.fillStyle = DMG.light
+    g.font = `9px ${MONO}`
+    g.fillText('A SELECT   B BACK', halfW / 2, halfH - 8)
+  }
+
   ctx.imageSmoothingEnabled = false
   ctx.drawImage(layer.canvas, 0, 0, VIEW_W, VIEW_H)
+}
+
+/** A pause row's wording, which for sound depends on what it currently is. */
+function pauseLabel(item: PauseItem, world: World): string {
+  if (item === 'sound') return world.soundOn ? 'SOUND ON' : 'SOUND OFF'
+  return item.toUpperCase()
 }
 
 function drawHud(ctx: CanvasRenderingContext2D, world: World): void {

@@ -55,7 +55,15 @@ export default defineConfig({
           'A shelf of little games. Pick one off the shelf and it comes to you.',
         start_url: base,
         scope: base,
+        /**
+         * Installed, the shelf should own the whole screen: no address bar, no
+         * title bar, no status bar. `display_override` is what browsers that
+         * understand it read first, and `display` is what everything else
+         * falls back to — including Safari, which does not know `fullscreen`
+         * and would otherwise drop all the way back to a normal browser window.
+         */
         display: 'standalone',
+        display_override: ['fullscreen', 'standalone'],
         lang: 'en',
         categories: ['games', 'entertainment'],
         // Both match the page background, so an installed window opens on the

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Group, Mesh } from 'three'
 import type { DecorationDefinition } from './decorations/types'
 import { onPoke } from './poke'
+import { beginMoving } from './sceneMotion'
 import { useShelf } from './shelfState'
 
 /**
@@ -121,6 +122,13 @@ export function Decoration({
 
   useEffect(() => onPoke(definition.id, trigger), [definition.id, trigger])
   useEffect(() => () => window.clearTimeout(settle.current), [])
+
+  // A poke and a hover both move the piece, so its shadow has to keep up with
+  // it rather than sitting where it was before.
+  useEffect(() => {
+    if (!poked && !hovered) return
+    return beginMoving()
+  }, [poked, hovered])
 
   useFrame((_, delta) => {
     const node = group.current

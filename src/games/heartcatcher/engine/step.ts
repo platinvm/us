@@ -20,7 +20,16 @@ import {
  * renderer re-running for things that only matter to the presentation.
  */
 
-export type Phase = 'title' | 'playing' | 'note' | 'win' | 'over'
+export type Phase = 'title' | 'playing' | 'note' | 'win' | 'over' | 'paused'
+
+/**
+ * The pause menu, in the order it is drawn.
+ *
+ * One list, so the rows on the screen, the rows the input walks through and the
+ * actions those rows perform can never drift apart.
+ */
+export const PAUSE_ITEMS = ['resume', 'sound', 'exit'] as const
+export type PauseItem = (typeof PAUSE_ITEMS)[number]
 
 export type ItemType = 'heart' | 'broken' | 'gold'
 
@@ -91,6 +100,15 @@ export type World = {
    */
   activeNote: string
   finalMessage: string
+  /** Which row of the pause menu is highlighted. */
+  menuIndex: number
+  /** What the pause menu interrupted, so closing it lands back there. */
+  pausedFrom: Phase
+  /**
+   * Whether the handheld is making noise. The world owns it because the menu
+   * draws it; the audio bus is told to follow it.
+   */
+  soundOn: boolean
 }
 
 export type Input = {
@@ -136,6 +154,9 @@ export function createWorld(): World {
     events: [],
     activeNote: NOTES[0] ?? '',
     finalMessage: FINAL_MESSAGE,
+    menuIndex: 0,
+    pausedFrom: 'playing',
+    soundOn: true,
   }
   resetWorld(world)
   return world
@@ -160,6 +181,8 @@ export function resetWorld(world: World): void {
   world.events.length = 0
   world.activeNote = NOTES[0] ?? ''
   world.finalMessage = FINAL_MESSAGE
+  world.menuIndex = 0
+  world.pausedFrom = 'playing'
 }
 
 /** Begins a fresh run. */
@@ -171,6 +194,37 @@ export function startRun(world: World): void {
 /** Dismisses a note and continues the run. */
 export function resumeRun(world: World): void {
   world.phase = 'playing'
+}
+
+/**
+ * Opens the pause menu, remembering what it interrupted.
+ *
+ * Only a run in progress can be paused. The title, the win panel and the
+ * game-over panel each hand the A button to something already, and a menu over
+ * the top of them would leave nothing to come back to.
+ */
+export function openMenu(world: World): void {
+  if (world.phase !== 'playing' && world.phase !== 'note') return
+  world.pausedFrom = world.phase
+  world.phase = 'paused'
+  world.menuIndex = 0
+}
+
+/** Closes the menu and puts the run back exactly as it was. */
+export function closeMenu(world: World): void {
+  if (world.phase !== 'paused') return
+  world.phase = world.pausedFrom
+}
+
+/** Walks the highlight, wrapping at both ends. */
+export function moveMenu(world: World, delta: number): void {
+  const count = PAUSE_ITEMS.length
+  world.menuIndex = (world.menuIndex + delta + count) % count
+}
+
+/** The row the player is about to pick. */
+export function selectedItem(world: World): PauseItem {
+  return PAUSE_ITEMS[world.menuIndex] ?? PAUSE_ITEMS[0]
 }
 
 /** How many hearts must be caught before note `i` appears. */

@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useEffect, useRef, useState } from 'react'
 import type { Group } from 'three'
 import type { FocusSignal, GameDefinition } from '../games/types'
+import { beginMoving } from './sceneMotion'
 import { useShelf } from './shelfState'
 import { usePrefersReducedMotion } from './usePrefersReducedMotion'
 
@@ -55,6 +56,8 @@ export function ShelfSlot({
   const moving = useRef<Group>(null)
   const progress = useRef(0)
   const settled = useRef(true)
+  /** Held open while the prop is on its way in or out, so shadows follow it. */
+  const stopMoving = useRef<(() => void) | null>(null)
   /**
    * Handed to the prop so it can animate off the same ramp without React
    * re-rendering this slot on every frame of the pick-up.
@@ -68,6 +71,8 @@ export function ShelfSlot({
   useEffect(
     () => () => {
       if (!settled.current) setBusy(false)
+      stopMoving.current?.()
+      stopMoving.current = null
     },
     [setBusy],
   )
@@ -94,6 +99,13 @@ export function ShelfSlot({
     if (settled.current !== done) {
       settled.current = done
       setBusy(!done)
+
+      if (done) {
+        stopMoving.current?.()
+        stopMoving.current = null
+      } else {
+        stopMoving.current = beginMoving()
+      }
     }
 
     const eased = easeInOutCubic(progress.current)

@@ -246,6 +246,45 @@ body {
   outline-offset: 2px;
 }
 
+/*
+ * On a phone the card is the only thing on screen and a fingertip is the only
+ * pointer, so it stops being a desktop tooltip: bigger type, and controls at the
+ * 44px that a thumb can actually hit.
+ */
+@media (pointer: coarse), (max-width: 520px) {
+  .pwa {
+    right: max(12px, env(safe-area-inset-right, 0px));
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    gap: 10px;
+    max-width: min(360px, calc(100vw - 24px));
+  }
+
+  .pwa__card {
+    gap: 14px;
+    padding: 13px 13px 13px 16px;
+    border-radius: 16px;
+  }
+
+  .pwa__text {
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  .pwa__button {
+    min-height: 44px;
+    padding: 10px 18px;
+    font-size: 15px;
+    border-radius: 11px;
+  }
+
+  .pwa__dismiss {
+    width: 44px;
+    height: 44px;
+    font-size: 22px;
+    border-radius: 11px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .shelf-index {
     transition: none;

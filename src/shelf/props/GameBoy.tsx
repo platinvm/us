@@ -8,14 +8,19 @@ import { createAudioBus } from '../../games/heartcatcher/engine/audio'
 import type { AudioBus } from '../../games/heartcatcher/engine/audio'
 import { render } from '../../games/heartcatcher/engine/render'
 import {
+  closeMenu,
   createWorld,
   drainEvents,
+  moveMenu,
+  openMenu,
   resumeRun,
+  selectedItem,
   startRun,
   update,
 } from '../../games/heartcatcher/engine/step'
 import type { Input, World } from '../../games/heartcatcher/engine/step'
 import type { ShelfPropProps } from '../../games/types'
+import { useShelf } from '../shelfState'
 import { useCanvasTexture } from './canvasTexture'
 
 /*
@@ -110,12 +115,12 @@ function ShellLabel({
  */
 export function GameBoy({ focused, hovered }: ShelfPropProps) {
   const [world] = useState<World>(createWorld)
+  const { release } = useShelf()
 
   const input = useRef<Input>({ dir: 0 })
   const padDir = useRef<PadDir>(0)
   const heldKeys = useRef<Set<string>>(new Set())
   const audioRef = useRef<AudioBus | null>(null)
-  const soundOn = useRef(true)
   const [hoveringButton, setHoveringButton] = useState(false)
   const shell = useRef<Group>(null)
 
@@ -148,18 +153,35 @@ export function GameBoy({ focused, hovered }: ShelfPropProps) {
     }
   }, [])
 
-  const primary = useCallback(() => {
+  const toggleSound = useCallback(() => {
+    world.soundOn = !world.soundOn
+    if (audioRef.current) audioRef.current.enabled = world.soundOn
     audioRef.current?.unlock()
-    if (world.phase === 'title') startRun(world)
-    else if (world.phase === 'note') resumeRun(world)
-    else if (world.phase === 'win' || world.phase === 'over') startRun(world)
   }, [world])
 
-  const toggleSound = useCallback(() => {
-    soundOn.current = !soundOn.current
-    if (audioRef.current) audioRef.current.enabled = soundOn.current
+  /** Does whatever the highlighted pause row says. */
+  const choosePauseItem = useCallback(() => {
+    const item = selectedItem(world)
+    // Exit is the same thing Escape does: the handheld goes back on the shelf.
+    if (item === 'exit') release()
+    else if (item === 'sound') toggleSound()
+    else closeMenu(world)
+  }, [world, release, toggleSound])
+
+  const primary = useCallback(() => {
     audioRef.current?.unlock()
-  }, [])
+    if (world.phase === 'paused') choosePauseItem()
+    else if (world.phase === 'title') startRun(world)
+    else if (world.phase === 'note') resumeRun(world)
+    else if (world.phase === 'win' || world.phase === 'over') startRun(world)
+  }, [world, choosePauseItem])
+
+  /** B opens the menu, and closes it again if it is already open. */
+  const toggleMenu = useCallback(() => {
+    audioRef.current?.unlock()
+    if (world.phase === 'paused') closeMenu(world)
+    else openMenu(world)
+  }, [world])
 
   const dirFromKeys = () => {
     const held = heldKeys.current
@@ -220,15 +242,21 @@ export function GameBoy({ focused, hovered }: ShelfPropProps) {
     if (!focused) {
       heldKeys.current.clear()
       padDir.current = 0
+      // The shelf has it back; nothing should be left sitting on a menu.
+      closeMenu(world)
       return
     }
 
     const onKeyDown = (event: KeyboardEvent) => {
       const key = event.key.toLowerCase()
+      const left = key === 'arrowleft' || key === 'a'
+      const right = key === 'arrowright' || key === 'd'
 
-      if (key === 'arrowleft' || key === 'arrowright' || key === 'a' || key === 'd') {
+      if (left || right) {
         event.preventDefault()
-        heldKeys.current.add(key)
+        // With the menu up, the directions walk it instead of the jar.
+        if (world.phase === 'paused') moveMenu(world, left ? -1 : 1)
+        else heldKeys.current.add(key)
         return
       }
 
@@ -238,9 +266,9 @@ export function GameBoy({ focused, hovered }: ShelfPropProps) {
         return
       }
 
-      if (key === 's' || key === 'b') {
+      if (key === 'b' || key === 's') {
         event.preventDefault()
-        toggleSound()
+        toggleMenu()
       }
     }
 
@@ -258,7 +286,7 @@ export function GameBoy({ focused, hovered }: ShelfPropProps) {
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', onBlur)
     }
-  }, [focused, primary, toggleSound])
+  }, [focused, primary, toggleMenu, world])
 
   // A press that ends away from the button should still release it.
   useEffect(() => {
@@ -273,6 +301,11 @@ export function GameBoy({ focused, hovered }: ShelfPropProps) {
 
   const holdPad = (direction: -1 | 1) => () => {
     audioRef.current?.unlock()
+    // The D-pad walks the menu too, rather than shoving a frozen jar about.
+    if (world.phase === 'paused') {
+      moveMenu(world, direction)
+      return
+    }
     padDir.current = direction
     world.player.target = null
   }
@@ -368,14 +401,15 @@ export function GameBoy({ focused, hovered }: ShelfPropProps) {
         />
       </mesh>
 
-      {/* D-pad */}
-      <group position={[-0.15, 0.225, FACE + 0.008]}>
+      {/* D-pad. Oversized for the shell on purpose: it is the control a thumb
+          holds for a whole run and has to find without looking. */}
+      <group position={[-0.15, 0.218, FACE + 0.008]}>
         <mesh castShadow>
-          <boxGeometry args={[0.125, 0.042, 0.016]} />
+          <boxGeometry args={[0.17, 0.058, 0.016]} />
           <meshStandardMaterial color={BUTTON_B} roughness={0.45} />
         </mesh>
         <mesh castShadow>
-          <boxGeometry args={[0.042, 0.125, 0.016]} />
+          <boxGeometry args={[0.058, 0.17, 0.016]} />
           <meshStandardMaterial color={BUTTON_B} roughness={0.45} />
         </mesh>
       </group>
@@ -422,9 +456,9 @@ export function GameBoy({ focused, hovered }: ShelfPropProps) {
           D-pad is all this needs; the rest was clutter that read as stripes. */}
 
       {/* Where you actually press */}
-      {hitbox('pad-left', [-0.182, 0.225, FACE + 0.05], [0.068, 0.14, 0.05], holdPad(-1), dropPad(-1))}
-      {hitbox('pad-right', [-0.118, 0.225, FACE + 0.05], [0.068, 0.14, 0.05], holdPad(1), dropPad(1))}
-      {hitbox('button-b', [0.115, 0.2, FACE + 0.06], [0.08, 0.08, 0.05], toggleSound, () => {})}
+      {hitbox('pad-left', [-0.1925, 0.218, FACE + 0.05], [0.085, 0.2, 0.05], holdPad(-1), dropPad(-1))}
+      {hitbox('pad-right', [-0.1075, 0.218, FACE + 0.05], [0.085, 0.2, 0.05], holdPad(1), dropPad(1))}
+      {hitbox('button-b', [0.115, 0.2, FACE + 0.06], [0.08, 0.08, 0.05], toggleMenu, () => {})}
       {hitbox('button-a', [0.205, 0.253, FACE + 0.06], [0.08, 0.08, 0.05], primary, () => {})}
     </group>
   )

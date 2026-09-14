@@ -1,6 +1,6 @@
 import { Environment, Lightformer, Preload } from '@react-three/drei'
-import { Canvas } from '@react-three/fiber'
-import { Suspense, useMemo } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { ACESFilmicToneMapping, Euler, Vector3 } from 'three'
 import { findGame } from '../games/registry'
 import { CAMERA_FOV, CameraRig } from './CameraRig'
@@ -10,10 +10,46 @@ import { Decoration } from './Decoration'
 import { SHELF, lowestDeckY, rowY } from './layout'
 import { PALETTE } from './palette'
 import { buildPlan } from './plan'
+import { isMoving } from './sceneMotion'
 import { ShelfSlot } from './ShelfSlot'
 import { useShelf } from './shelfState'
 import { ShelfUnit } from './ShelfUnit'
+import { useSceneQuality } from './useSceneQuality'
 import { Wall } from './Wall'
+
+/**
+ * How often shadows are redrawn while nothing that casts one is moving.
+ *
+ * Six frames is a tenth of a second: slow enough to be worth having, quick
+ * enough that anything animating that never marked itself still reads as alive.
+ */
+const IDLE_SHADOW_INTERVAL = 6
+
+/**
+ * Keeps the shadow pass off the frame budget while the shelf is still.
+ *
+ * Nothing else in the scene draws itself twice, so this is the one place where
+ * skipping work is worth more than everything else put together.
+ */
+function ShadowBudget() {
+  const gl = useThree((state) => state.gl)
+  const frame = useRef(0)
+
+  useEffect(() => {
+    // From here the shadow map is redrawn when this says so, not every frame.
+    gl.shadowMap.autoUpdate = false
+    gl.shadowMap.needsUpdate = true
+  }, [gl])
+
+  useFrame(() => {
+    frame.current += 1
+    if (isMoving() || frame.current % IDLE_SHADOW_INTERVAL === 0) {
+      gl.shadowMap.needsUpdate = true
+    }
+  })
+
+  return null
+}
 
 /**
  * The shelf, on its wall, in a bedroom — and the games, on the shelf.
@@ -26,6 +62,7 @@ import { Wall } from './Wall'
  */
 export function ShelfScene() {
   const { focusedId, release, browsing, busy } = useShelf()
+  const quality = useSceneQuality()
 
   const plan = useMemo(() => buildPlan(), [])
   const rows = plan.length
@@ -115,9 +152,9 @@ export function ShelfScene() {
   return (
     <Canvas
       shadows="percentage"
-      dpr={[1, 2]}
+      dpr={quality.dpr}
       camera={{ fov: CAMERA_FOV, position: [0, framing.centreY, 6], near: 0.05, far: 60 }}
-      gl={{ antialias: true, powerPreference: 'high-performance' }}
+      gl={{ antialias: quality.antialias, powerPreference: 'high-performance' }}
       // Tapping the wall or anything else puts a game back — but not while it
       // is still on its way to or from your hands.
       onPointerMissed={() => {
@@ -130,6 +167,8 @@ export function ShelfScene() {
     >
       <color attach="background" args={[PALETTE.wallBottom]} />
 
+      <ShadowBudget />
+
       <ambientLight intensity={0.38} color="#c9b6e0" />
       <hemisphereLight args={['#ffd9b0', '#3a2a48', 0.5]} />
 
@@ -138,7 +177,7 @@ export function ShelfScene() {
         intensity={1.45}
         color="#fff0dc"
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize={[quality.shadowMapSize, quality.shadowMapSize]}
         shadow-camera-near={0.5}
         shadow-camera-far={14}
         shadow-camera-left={-3.2}
