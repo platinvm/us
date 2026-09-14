@@ -2,12 +2,6 @@
    ♥  EDIT EVERYTHING IN THIS BLOCK — no other file needs touching  ♥
    ========================================================================== */
 
-/** Her name or nickname. */
-export const HER_NAME = 'Amore'
-
-/** Your name. */
-export const YOUR_NAME = 'Me'
-
 /**
  * Little notes that pop up as hearts are caught. Add or remove freely — the
  * game paces itself to however many you write.

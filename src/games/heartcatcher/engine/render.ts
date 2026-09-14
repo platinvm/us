@@ -2,9 +2,7 @@ import {
   DMG,
   GROUND,
   HEARTS_TO_WIN,
-  HER_NAME,
   LIVES,
-  YOUR_NAME,
   VIEW_H,
   VIEW_W,
 } from '../config'
@@ -307,25 +305,24 @@ function drawOverlay(ctx: CanvasRenderingContext2D, world: World): void {
   if (world.phase === 'win') {
     g.fillStyle = DMG.lightest
     g.font = `bold 13px ${MONO}`
-    g.fillText('HAPPY 2ND', halfW / 2, 24)
-    g.fillText('ANNIVERSARY', halfW / 2, 40)
+    g.fillText('HAPPY 2ND', halfW / 2, 26)
+    g.fillText('ANNIVERSARY', halfW / 2, 42)
 
     g.fillStyle = DMG.light
     g.font = `10px ${MONO}`
     // Wrapped a shade wider than the other panels. The message is four lines at
     // the narrower measure, which is one line more than this screen has room
-    // for once the names, the score and the prompt have had theirs.
+    // for once the score and the prompt have had theirs.
     const lines = wrapText(g, world.finalMessage, halfW - 22)
-    drawLines(g, lines, halfW / 2, blockTop(lines.length, 13, 52, 96), 13)
+    drawLines(g, lines, halfW / 2, blockTop(lines.length, 13, 54, 100), 13)
 
     g.fillStyle = DMG.lightest
-    g.font = `bold 9px ${MONO}`
-    g.fillText(`${HER_NAME} + ${YOUR_NAME}`, halfW / 2, 106)
-    g.fillText(`SCORE ${world.score}`, halfW / 2, 117)
+    g.font = `bold 10px ${MONO}`
+    g.fillText(`SCORE ${world.score}`, halfW / 2, 114)
 
     g.fillStyle = DMG.light
     g.font = `bold 10px ${MONO}`
-    g.fillText(prompt, halfW / 2, 133)
+    g.fillText(prompt, halfW / 2, promptY)
   }
 
   if (world.phase === 'over') {
